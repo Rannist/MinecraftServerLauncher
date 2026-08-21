@@ -1,0 +1,22 @@
+# Minecraft Server Launcher
+
+- 用途：Windows 图形化 Minecraft Java 版服务端启动器，负责多服务器配置、官方核心下载、JVM 内存、进程启停和控制台命令。
+- 技术栈：JavaScript（Electron 主进程、预加载桥接和前端逻辑）、HTML、CSS、JSON、Java（Paper/Purpur 命令补全桥接插件）；Electron、Bukkit API。
+- 构建工具：npm、electron-builder。
+- 图标资产：`assets/app-icon.png` 用于 Electron 窗口和任务栏，`assets/app-icon.ico` 由 electron-builder 内嵌到 Windows EXE。
+- 关键入口：用户运行 `Minecraft开服器/Minecraft开服器.exe`；程序入口为 `main.js`、`preload.js`、`renderer/index.html`；桥接插件源码在 `completion-bridge/src/main/java`；项目文件为 `package.json`。
+- 常用命令：`npm start`、`npm run check`、`npm run folder`（生成文件夹版）、`npm run installer`（生成 NSIS 安装程序）；`powershell -ExecutionPolicy Bypass -File completion-bridge/build.ps1`（生成 `outputs/jars/LauncherCompletionBridge.jar`）。
+- 项目规则：发布版启动器配置固定写入 EXE 同目录的 `launcher-config.json`，开发环境写入项目根目录；不得修改用户选择的服务端文件，但首次启动前可在用户确认后写入其服务端目录的 `eula.txt`。
+- 安装程序：使用 NSIS 当前用户安装，允许选择安装目录；每次安装和升级都必须重建桌面快捷方式，并创建开始菜单快捷方式；安装包不预置 `launcher-config.json`，升级不得覆盖用户配置；卸载时保留安装目录内的 `launcher-config.json` 和 `Serverlist`。
+- 自动更新：公开更新源固定为 `Rannist/MinecraftServerLauncher` 的 GitHub Releases；使用 `electron-updater` 启动后检查并后台下载，程序设置内可手动检查和查看进度，只有发现新版时左侧底部显示更新按钮；关闭程序时不得自动安装，只有用户明确点击“立即更新”且服务器已停止时才允许重启安装；`.github/workflows/release.yml` 由与 `package.json` 版本一致的 `v*` 标签触发并发布安装程序及更新元数据。
+- 核心下载：只允许 Vanilla、Paper、Purpur、Fabric 的官方 HTTPS 域名；Paper 请求必须携带明确的自定义 User-Agent；默认根目录为 EXE 同目录的 `Serverlist`（自动创建），用户可在下载中心更改；每次下载都创建并选中新服务器，首个目录按“核心-版本”命名，重名时使用 `-2/-3` 后缀创建全新隔离目录，不写入已有服务器目录；弹出单按钮完成提示，确认后关闭下载中心；每个服务器用 `isolationRoot` 记住自定义根位置。
+- 本地服务器导入：启动时及用户点击扫描按钮时读取默认 `Serverlist` 的一级子目录；未登记且只有一个顶层 JAR 的目录自动加入服务器列表，存在多个顶层 JAR 时必须跳过并提示，不擅自选择核心。
+- 配置结构：`launcher-config.json` 使用 `selectedServerId` 和 `servers[]`，每个服务器独立保存可重命名的显示名称、目录、JAR、内存和 JVM 参数；读取时兼容旧单服务器结构；删除服务器只移除列表配置并保留服务器文件，且至少保留一个服务器项。
+- 旧配置修复：配置中的 JAR 丢失且服务器运行目录只有一个顶层 JAR 时，加载配置会自动改用该核心并回写配置；存在多个候选时不擅自选择。
+- 服务端配置：内置 `server.properties` 常用项编辑器；读取和保存限定在当前服务器运行目录，保存时保留未知键和注释，写入后立即回读校验并明确提示；配置界面存在未保存修改时，启动服务器前自动保存，服务器运行期间禁止写入。
+- 启动依赖下载：识别服务端控制台的 `Downloading *.jar` 输出并在控制台顶部显示进度条；有百分比时显示实际进度，否则使用不确定进度动画，进入后续启动阶段或进程结束时隐藏。
+- 控制台命令：Paper/Purpur 启动时自动向各自 `plugins` 部署 `LauncherCompletionBridge.jar`，输入框通过当前服务器实时补全一级/二级指令、插件指令和在线玩家；桥接未就绪以及 Vanilla/Fabric 使用本地一级指令后备；支持 Tab/Shift+Tab 循环、可点击候选和 Esc 关闭。
+- 控制台显示：解析并保留服务端 ANSI 前景色和加粗样式；无 ANSI 颜色的 stderr、ERROR、SEVERE、FATAL 行使用红色。
+- 插件管理：主界面提供当前服务端插件列表，读取运行目录 `plugins` 下的 JAR 文件，并可直接打开该插件文件夹。
+- 界面规则：保持无系统边框、深色现代化视觉，不使用默认原生控件外观；低分辨率可读性优先，普通文字不低于 11px，辅助信息不低于 10px，中文优先使用微软雅黑界面字体。
+- 布局规则：窗口、主区和控制台使用 `minmax(0,1fr)` 高度链，日志不得撑开主界面或挤出命令栏/底部按钮；控制台保持可见纵向滚动条；新日志仅在用户位于底部时自动跟随，手动上翻后不得强制拉回；内存和额外 JVM 参数放在“启动设置”抽屉，不常驻主界面；核心下载入口放在左侧服务器栏；窗口最小为 860×580，侧栏与主区间距随窗口连续缩放，避免断点跳动。
