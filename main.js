@@ -497,6 +497,40 @@ ipcMain.handle('get-default-server-root', () => {
   }
 });
 
+ipcMain.handle('scan-default-server-root', (_, knownDirectories = []) => {
+  try {
+    const rootDirectory = defaultServerRoot();
+    fs.mkdirSync(rootDirectory, { recursive: true });
+    const known = new Set((Array.isArray(knownDirectories) ? knownDirectories : [])
+      .filter((directory) => typeof directory === 'string' && directory)
+      .map((directory) => path.resolve(directory).toLowerCase()));
+    const servers = [];
+    const ambiguous = [];
+    const directories = fs.readdirSync(rootDirectory, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .slice(0, 200);
+    for (const entry of directories) {
+      const serverDirectory = path.join(rootDirectory, entry.name);
+      if (known.has(path.resolve(serverDirectory).toLowerCase())) continue;
+      let jars;
+      try {
+        jars = fs.readdirSync(serverDirectory, { withFileTypes: true })
+          .filter((file) => file.isFile() && file.name.toLowerCase().endsWith('.jar') && !file.name.toLowerCase().endsWith('.part.jar'))
+          .map((file) => file.name);
+      } catch { continue; }
+      if (jars.length === 1) {
+        const jarPath = path.join(serverDirectory, jars[0]);
+        servers.push({ name: entry.name, serverDirectory, jarPath, coreType: inferCoreType(jarPath) });
+      } else if (jars.length > 1) {
+        ambiguous.push({ name: entry.name, serverDirectory, jarCount: jars.length });
+      }
+    }
+    return { ok: true, rootDirectory, servers, ambiguous };
+  } catch (error) {
+    return { ok: false, error: `扫描 Serverlist 失败：${error.message}` };
+  }
+});
+
 ipcMain.handle('get-core-versions', async (_, coreId) => {
   try { return { ok: true, versions: await getCoreVersions(coreId) }; }
   catch (error) { return { ok: false, error: error.message }; }
@@ -674,6 +708,18 @@ ipcMain.handle('install-update', () => {
   setImmediate(() => autoUpdater.quitAndInstall(false, true));
   return { ok: true };
 });
+
+ipcMain.handle('check-for-updates', async () => {
+  if (!app.isPackaged) return { ok: false, error: '开发模式不支持自动更新检查。' };
+  try {
+    await autoUpdater.checkForUpdates();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: formatUpdateError(error) };
+  }
+});
+
+ipcMain.handle('get-app-version', () => app.getVersion());
 
 app.whenReady().then(() => { createWindow(); setupAutoUpdates(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

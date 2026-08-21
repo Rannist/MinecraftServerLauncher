@@ -33,9 +33,11 @@ let defaultDownloadRoot = '';
 let propertiesDirty = false;
 let loadedPropertiesDirectory = '';
 let profileMode = 'create';
+let scanningServers = false;
 let downloadedUpdateVersion = '';
+let latestUpdateVersion = '';
+let currentAppVersion = '';
 let updatePromptActive = false;
-let updateStatusHideTimer = null;
 const COMMAND_COMPLETIONS = Object.freeze([
   'ban', 'ban-ip', 'banlist', 'clear', 'data', 'deop', 'difficulty', 'effect', 'enchant',
   'execute', 'experience', 'fill', 'forceload', 'function', 'gamemode', 'gamerule', 'give',
@@ -141,16 +143,40 @@ $('#modal-cancel').addEventListener('click', () => closeModal(false));
 
 function showUpdateStatus(text, state = '') {
   const button = $('#update-status');
-  clearTimeout(updateStatusHideTimer);
   button.textContent = text;
   button.className = `update-status${state ? ` ${state}` : ''}`;
-  button.disabled = state !== 'ready' || running;
+  button.disabled = false;
 }
 
-function hideUpdateStatus(delay = 0) {
-  clearTimeout(updateStatusHideTimer);
-  updateStatusHideTimer = setTimeout(() => $('#update-status').classList.add('hidden'), delay);
+function hideUpdateStatus() {
+  $('#update-status').classList.add('hidden');
 }
+
+function setUpdateSettings(title, description, checking = false) {
+  $('#settings-update-title').textContent = title;
+  $('#settings-update-description').textContent = description;
+  $('#check-app-update').disabled = checking;
+}
+
+function openAppSettings() { $('#app-settings-backdrop').classList.remove('hidden'); }
+function closeAppSettings() { $('#app-settings-backdrop').classList.add('hidden'); }
+
+$('#open-app-settings').addEventListener('click', openAppSettings);
+$('#close-app-settings').addEventListener('click', closeAppSettings);
+$('#app-settings-backdrop').addEventListener('click', (event) => {
+  if (event.target === $('#app-settings-backdrop')) closeAppSettings();
+});
+
+$('#check-app-update').addEventListener('click', async () => {
+  setUpdateSettings('正在检查更新', '正在连接 GitHub Release…', true);
+  const result = await window.launcher.checkForUpdates();
+  if (!result.ok) setUpdateSettings('更新检查失败', result.error);
+});
+
+$('#install-app-update').addEventListener('click', () => {
+  closeAppSettings();
+  promptDownloadedUpdate();
+});
 
 async function promptDownloadedUpdate() {
   if (!downloadedUpdateVersion || running || updatePromptActive) return;
@@ -170,7 +196,10 @@ async function promptDownloadedUpdate() {
   if (!result.ok) await showModal('暂时无法更新', result.error, { confirmText: '知道了', singleButton: true });
 }
 
-$('#update-status').addEventListener('click', promptDownloadedUpdate);
+$('#update-status').addEventListener('click', () => {
+  if (downloadedUpdateVersion && !running) promptDownloadedUpdate();
+  else openAppSettings();
+});
 
 function updateMemoryPreview() {
   $('#memory-min-preview').textContent = fields.minMemory.value || '—';
@@ -390,12 +419,13 @@ function setRunning(value) {
   $('#command').disabled = !value;
   if (!value) hideCommandSuggestions();
   $('#add-server').disabled = value;
+  $('#scan-servers').disabled = value || scanningServers;
   $('#rename-server').disabled = value;
   $('#delete-server').disabled = value || appConfig.servers.length <= 1;
   $('#open-downloads').disabled = value;
   $('#open-settings').disabled = value;
   $('#open-properties').disabled = value;
-  if (downloadedUpdateVersion) $('#update-status').disabled = value;
+  $('#install-app-update').disabled = value || !downloadedUpdateVersion;
   Object.values(fields).forEach((field) => { field.disabled = value; });
   if (value) { closeSettings(); closeProperties(); }
   $('.status-pill').classList.toggle('running', value);
@@ -415,7 +445,6 @@ function setRunning(value) {
     uptimeTimer = null;
     $('#uptime').textContent = '准备就绪';
     hideStartupProgress();
-    promptDownloadedUpdate();
   }
 }
 
@@ -431,7 +460,65 @@ function openProfileEditor(mode) {
   setTimeout(() => { $('#profile-name').focus(); $('#profile-name').select(); }, 50);
 }
 
+function createImportedServer(candidate, rootDirectory, index) {
+  let id = `server-import-${Date.now()}-${index}`;
+  while (appConfig.servers.some((server) => server.id === id)) id += '-2';
+  return {
+    id,
+    name: candidate.name,
+    isolationRoot: rootDirectory,
+    serverDirectory: candidate.serverDirectory,
+    jarPath: candidate.jarPath,
+    coreType: candidate.coreType || inferCoreType(candidate.jarPath),
+    minMemory: 2048,
+    maxMemory: 4096,
+    extraArgs: ''
+  };
+}
+
+async function scanLocalServers(showResult = false) {
+  if (running || scanningServers) return;
+  scanningServers = true;
+  $('#scan-servers').disabled = true;
+  const result = await window.launcher.scanDefaultServerRoot(appConfig.servers.map((server) => server.serverDirectory));
+  scanningServers = false;
+  $('#scan-servers').disabled = false;
+  if (!result.ok) {
+    if (showResult) await showModal('扫描失败', result.error, { confirmText: '知道了', singleButton: true });
+    return;
+  }
+
+  const imported = result.servers.map((candidate, index) => createImportedServer(candidate, result.rootDirectory, index));
+  if (imported.length) {
+    const placeholder = appConfig.servers.length === 1 && !appConfig.servers[0].serverDirectory && !appConfig.servers[0].jarPath;
+    if (placeholder) {
+      const replacement = imported.shift();
+      replacement.id = appConfig.servers[0].id;
+      appConfig.servers[0] = replacement;
+      appConfig.selectedServerId = replacement.id;
+    }
+    appConfig.servers.push(...imported);
+    await window.launcher.saveConfig(appConfig);
+    loadCurrentServer();
+    renderServerList();
+  }
+
+  const importedCount = result.servers.length;
+  if (importedCount) appendConsole(`[Launcher] 已从 Serverlist 导入 ${importedCount} 个本地服务器。`, 'success');
+  if (showResult) {
+    let message = importedCount ? `成功导入 ${importedCount} 个服务器。` : '没有发现可导入的新服务器。';
+    if (result.ambiguous.length) {
+      const names = result.ambiguous.slice(0, 6).map((item) => `“${item.name}”（${item.jarCount} 个 JAR）`).join('、');
+      message += `\n\n以下目录存在多个顶层 JAR，为避免选错已跳过：${names}`;
+    } else if (!importedCount) {
+      message += '\n\n请确认服务器文件夹位于 Serverlist 内，并且文件夹顶层有且只有一个服务端 JAR。';
+    }
+    await showModal('扫描 Serverlist', message, { confirmText: '确定', singleButton: true, icon: importedCount ? '✓' : '↻' });
+  }
+}
+
 $('#add-server').addEventListener('click', () => openProfileEditor('create'));
+$('#scan-servers').addEventListener('click', () => scanLocalServers(true));
 $('#rename-server').addEventListener('click', () => { if (!running && currentServer()) openProfileEditor('rename'); });
 $('#delete-server').addEventListener('click', async () => {
   const server = currentServer();
@@ -761,23 +848,33 @@ $('#command').addEventListener('keydown', async (event) => {
 window.launcher.onServerOutput(({ text, kind }) => { appendConsole(text, kind); updateStartupProgress(text); });
 window.launcher.onServerState(() => setRunning(false));
 window.launcher.onUpdateStatus((status) => {
-  if (status.state === 'checking') showUpdateStatus('正在检查更新…');
+  if (status.state === 'checking') {
+    hideUpdateStatus();
+    setUpdateSettings('正在检查更新', '正在连接 GitHub Release…', true);
+  }
   else if (status.state === 'available') {
-    showUpdateStatus(`发现 v${status.version}，准备下载…`);
-    appendConsole(`[Launcher] 发现新版本 v${status.version}，正在后台下载。`, 'accent');
+    latestUpdateVersion = status.version;
+    showUpdateStatus(`发现新版 v${status.version}`);
+    setUpdateSettings(`发现新版本 v${status.version}`, '正在后台下载安装文件，完成后即可重启更新。');
   } else if (status.state === 'progress') {
-    showUpdateStatus(`正在下载更新 ${Math.round(status.percent || 0)}%`);
+    const percent = Math.round(status.percent || 0);
+    showUpdateStatus(`新版 v${latestUpdateVersion} · 下载 ${percent}%`);
+    setUpdateSettings(`正在下载 v${latestUpdateVersion}`, `安装文件下载进度 ${percent}%`);
   } else if (status.state === 'downloaded') {
     downloadedUpdateVersion = status.version;
-    showUpdateStatus(`v${status.version} 已下载，点击更新`, 'ready');
-    appendConsole(`[Launcher] 新版本 v${status.version} 已下载完成。`, 'accent');
-    promptDownloadedUpdate();
+    latestUpdateVersion = status.version;
+    showUpdateStatus(`新版 v${status.version} · 立即更新`, 'ready');
+    setUpdateSettings(`新版本 v${status.version} 已准备好`, '可以立即重启安装；服务器运行期间不会执行更新。');
+    $('#install-app-update').classList.remove('hidden');
+    $('#install-app-update').disabled = running;
   } else if (status.state === 'not-available') {
-    showUpdateStatus('当前已是最新版');
-    hideUpdateStatus(2500);
+    hideUpdateStatus();
+    $('#install-app-update').classList.add('hidden');
+    setUpdateSettings('当前已是最新版', `当前版本 v${currentAppVersion || status.version}`);
   } else if (status.state === 'error') {
-    showUpdateStatus('更新检查失败', 'error');
-    hideUpdateStatus(6000);
+    hideUpdateStatus();
+    $('#install-app-update').classList.add('hidden');
+    setUpdateSettings('更新检查失败', status.message || '暂时无法连接更新服务器。');
   }
 });
 window.launcher.onStopTimeout(async () => {
@@ -798,7 +895,11 @@ window.launcher.onCloseRequested(async () => {
   if (defaultRoot.ok) defaultDownloadRoot = defaultRoot.path;
   loadCurrentServer();
   renderServerList();
+  await scanLocalServers(false);
   const java = await window.launcher.detectJava();
   $('#java-status').textContent = java.version;
   $('#java-status').style.color = java.available ? 'var(--success)' : 'var(--danger)';
+  currentAppVersion = await window.launcher.getAppVersion();
+  $('#app-version').textContent = `Server Launcher · v${currentAppVersion}`;
+  $('#settings-app-version').textContent = `当前版本 v${currentAppVersion}`;
 })();

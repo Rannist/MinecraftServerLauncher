@@ -24,21 +24,24 @@
   </header>
 
   <aside class="sidebar">
-    <div class="server-list-title"><span>我的服务器</span><button id="add-server" title="添加服务器" aria-label="添加服务器"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg><span>添加</span></button></div>
+    <div class="server-list-title"><span>我的服务器</span><div class="server-list-actions"><button id="scan-servers" title="扫描并导入 Serverlist" aria-label="扫描并导入 Serverlist"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.45-3.53M13 3.5v3h-3"/></svg></button><button id="add-server" title="添加服务器" aria-label="添加服务器"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg><span>添加</span></button></div></div>
     <button id="open-downloads" class="sidebar-download">
       <span class="sidebar-download-icon"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M9 3v8m0 0 3-3m-3 3L6 8M4 14h10"/></svg></span>
       <strong>下载服务器核心</strong>
     </button>
     <div id="server-list" class="server-list"></div>
-    <div class="runtime-card"><span>JAVA RUNTIME</span><strong id="java-status">正在检测…</strong></div>
-    <p class="version">Server Launcher · v1.1</p>
+    <div class="sidebar-bottom">
+      <button id="update-status" class="update-status hidden" disabled>发现新版本</button>
+      <button id="open-app-settings" class="app-settings-trigger"><span>⚙</span><strong>程序设置</strong></button>
+      <div class="runtime-card"><span>JAVA RUNTIME</span><strong id="java-status">正在检测…</strong></div>
+      <p id="app-version" class="version">Server Launcher</p>
+    </div>
   </aside>
 
   <main>
     <section class="page-header">
       <div class="page-title"><div class="server-name-row"><h1 id="current-server-name">服务器控制中心</h1><button id="rename-server" class="rename-server" title="修改当前服务器名称">✎&nbsp; 重命名</button><button id="delete-server" class="delete-server" title="从列表删除当前服务器">×&nbsp; 删除</button></div><p>选择服务器、下载核心并管理你的 Minecraft 世界</p></div>
       <div class="header-actions">
-        <button id="update-status" class="update-status hidden" disabled>正在检查更新…</button>
         <button id="open-plugins" class="settings-trigger">◆&nbsp; 插件</button>
         <button id="open-properties" class="settings-trigger">▤&nbsp; 服务器配置</button>
         <button id="open-settings" class="settings-trigger">⚙&nbsp; 启动设置</button>
@@ -72,6 +75,24 @@
       </div>
       <div class="memory-preview"><span>当前内存范围</span><strong><b id="memory-min-preview">2048</b> — <b id="memory-max-preview">4096</b> MB</strong></div>
       <button id="save-settings" class="primary drawer-save">保存当前服务器设置</button>
+    </section>
+  </div>
+
+  <div id="app-settings-backdrop" class="drawer-backdrop hidden">
+    <section class="settings-drawer app-settings-drawer">
+      <div class="drawer-header"><div><span>APPLICATION</span><h2>程序设置</h2></div><button id="close-app-settings" aria-label="关闭程序设置">×</button></div>
+      <p class="drawer-description">管理开服器自身的版本和更新，不会修改任何服务器文件。</p>
+      <div class="app-info-card">
+        <span class="app-info-icon">M</span>
+        <div><strong>Minecraft 开服器</strong><small id="settings-app-version">当前版本读取中…</small></div>
+      </div>
+      <div class="update-settings-card">
+        <div><span>AUTO UPDATE</span><strong id="settings-update-title">正在检查更新</strong><small id="settings-update-description">正在连接 GitHub Release…</small></div>
+        <div class="update-settings-actions">
+          <button id="check-app-update">检查更新</button>
+          <button id="install-app-update" class="primary hidden">立即重启更新</button>
+        </div>
+      </div>
     </section>
   </div>
 
