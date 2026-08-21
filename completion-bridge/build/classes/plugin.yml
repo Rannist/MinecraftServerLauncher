@@ -1,0 +1,12 @@
+name: LauncherCompletionBridge
+main: com.rannist.launcher.completion.LauncherCompletionBridge
+version: 1.0.0
+author: RANNIST
+description: Provides live console command completion to Minecraft Server Launcher.
+commands:
+  mslcomplete:
+    description: Internal launcher completion command.
+    permission: launchercompletion.internal
+permissions:
+  launchercompletion.internal:
+    default: op

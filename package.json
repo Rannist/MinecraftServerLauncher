@@ -1,8 +1,12 @@
 {
   "name": "minecraft-server-launcher",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "现代化 Minecraft Java 版图形开服器",
   "main": "main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Rannist/MinecraftServerLauncher.git"
+  },
   "author": "RANNIST",
   "license": "MIT",
   "scripts": {
@@ -23,6 +27,14 @@
     "directories": {
       "output": "dist"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Rannist",
+        "repo": "MinecraftServerLauncher",
+        "releaseType": "release"
+      }
+    ],
     "files": [
       "main.js",
       "preload.js",
@@ -56,5 +68,8 @@
       "artifactName": "Minecraft开服器-安装程序-${version}.${ext}",
       "deleteAppDataOnUninstall": false
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

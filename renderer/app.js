@@ -33,6 +33,9 @@ let defaultDownloadRoot = '';
 let propertiesDirty = false;
 let loadedPropertiesDirectory = '';
 let profileMode = 'create';
+let downloadedUpdateVersion = '';
+let updatePromptActive = false;
+let updateStatusHideTimer = null;
 const COMMAND_COMPLETIONS = Object.freeze([
   'ban', 'ban-ip', 'banlist', 'clear', 'data', 'deop', 'difficulty', 'effect', 'enchant',
   'execute', 'experience', 'fill', 'forceload', 'function', 'gamemode', 'gamerule', 'give',
@@ -135,6 +138,39 @@ function closeModal(result) {
 
 $('#modal-confirm').addEventListener('click', () => closeModal(true));
 $('#modal-cancel').addEventListener('click', () => closeModal(false));
+
+function showUpdateStatus(text, state = '') {
+  const button = $('#update-status');
+  clearTimeout(updateStatusHideTimer);
+  button.textContent = text;
+  button.className = `update-status${state ? ` ${state}` : ''}`;
+  button.disabled = state !== 'ready' || running;
+}
+
+function hideUpdateStatus(delay = 0) {
+  clearTimeout(updateStatusHideTimer);
+  updateStatusHideTimer = setTimeout(() => $('#update-status').classList.add('hidden'), delay);
+}
+
+async function promptDownloadedUpdate() {
+  if (!downloadedUpdateVersion || running || updatePromptActive) return;
+  if (document.querySelector('.modal-backdrop:not(.hidden), .overlay:not(.hidden), .drawer-backdrop:not(.hidden)')) {
+    setTimeout(promptDownloadedUpdate, 1000);
+    return;
+  }
+  updatePromptActive = true;
+  const install = await showModal(
+    '新版本已下载',
+    `Minecraft 开服器 v${downloadedUpdateVersion} 已准备完成。\n\n是否立即关闭程序并安装更新？服务器文件和开服器配置会保留。`,
+    { confirmText: '立即重启更新', cancelText: '稍后', icon: '↻' }
+  );
+  updatePromptActive = false;
+  if (!install) return;
+  const result = await window.launcher.installUpdate();
+  if (!result.ok) await showModal('暂时无法更新', result.error, { confirmText: '知道了', singleButton: true });
+}
+
+$('#update-status').addEventListener('click', promptDownloadedUpdate);
 
 function updateMemoryPreview() {
   $('#memory-min-preview').textContent = fields.minMemory.value || '—';
@@ -359,6 +395,7 @@ function setRunning(value) {
   $('#open-downloads').disabled = value;
   $('#open-settings').disabled = value;
   $('#open-properties').disabled = value;
+  if (downloadedUpdateVersion) $('#update-status').disabled = value;
   Object.values(fields).forEach((field) => { field.disabled = value; });
   if (value) { closeSettings(); closeProperties(); }
   $('.status-pill').classList.toggle('running', value);
@@ -378,6 +415,7 @@ function setRunning(value) {
     uptimeTimer = null;
     $('#uptime').textContent = '准备就绪';
     hideStartupProgress();
+    promptDownloadedUpdate();
   }
 }
 
@@ -722,6 +760,26 @@ $('#command').addEventListener('keydown', async (event) => {
 
 window.launcher.onServerOutput(({ text, kind }) => { appendConsole(text, kind); updateStartupProgress(text); });
 window.launcher.onServerState(() => setRunning(false));
+window.launcher.onUpdateStatus((status) => {
+  if (status.state === 'checking') showUpdateStatus('正在检查更新…');
+  else if (status.state === 'available') {
+    showUpdateStatus(`发现 v${status.version}，准备下载…`);
+    appendConsole(`[Launcher] 发现新版本 v${status.version}，正在后台下载。`, 'accent');
+  } else if (status.state === 'progress') {
+    showUpdateStatus(`正在下载更新 ${Math.round(status.percent || 0)}%`);
+  } else if (status.state === 'downloaded') {
+    downloadedUpdateVersion = status.version;
+    showUpdateStatus(`v${status.version} 已下载，点击更新`, 'ready');
+    appendConsole(`[Launcher] 新版本 v${status.version} 已下载完成。`, 'accent');
+    promptDownloadedUpdate();
+  } else if (status.state === 'not-available') {
+    showUpdateStatus('当前已是最新版');
+    hideUpdateStatus(2500);
+  } else if (status.state === 'error') {
+    showUpdateStatus('更新检查失败', 'error');
+    hideUpdateStatus(6000);
+  }
+});
 window.launcher.onStopTimeout(async () => {
   if (await showModal('停止超时', '服务器在 20 秒内没有退出，是否强制结束进程？', { confirmText: '强制结束', danger: true })) window.launcher.killServer();
   else $('#stop').disabled = false;

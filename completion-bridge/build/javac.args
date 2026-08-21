@@ -1,0 +1,9 @@
+--release
+8
+-encoding
+UTF-8
+-classpath
+"C:/Users/RANNIST/Desktop/CODEX/Server Launcher/completion-bridge/build/dependencies/spigot-api.jar"
+-d
+"C:/Users/RANNIST/Desktop/CODEX/Server Launcher/completion-bridge/build/classes"
+"C:/Users/RANNIST/Desktop/CODEX/Server Launcher/completion-bridge/src/main/java/com/rannist/launcher/completion/LauncherCompletionBridge.java"

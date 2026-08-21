@@ -24,9 +24,11 @@ contextBridge.exposeInMainWorld('launcher', {
   completeServerCommand: (command) => ipcRenderer.invoke('complete-server-command', command),
   stopServer: () => ipcRenderer.invoke('stop-server'),
   killServer: () => ipcRenderer.invoke('kill-server'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
   onServerOutput: (callback) => ipcRenderer.on('server-output', (_, value) => callback(value)),
   onDownloadProgress: (callback) => ipcRenderer.on('download-progress', (_, value) => callback(value)),
   onServerState: (callback) => ipcRenderer.on('server-state', (_, value) => callback(value)),
+  onUpdateStatus: (callback) => ipcRenderer.on('update-status', (_, value) => callback(value)),
   onStopTimeout: (callback) => ipcRenderer.on('stop-timeout', callback),
   onCloseRequested: (callback) => ipcRenderer.on('close-requested', callback)
 });

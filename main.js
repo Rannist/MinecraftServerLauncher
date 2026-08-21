@@ -3,12 +3,14 @@ const { spawn, execFile } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const readline = require('node:readline');
+const { autoUpdater } = require('electron-updater');
 
 let mainWindow;
 let serverProcess = null;
 let stopTimer = null;
 let completionBridgeReady = false;
 let completionRequestNumber = 0;
+let downloadedUpdateVersion = '';
 const pendingCompletions = new Map();
 
 const configDirectory = () => app.isPackaged ? path.dirname(process.execPath) : __dirname;
@@ -309,12 +311,53 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.once('ready-to-show', () => mainWindow.show());
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show();
+  }, 1500).unref();
   mainWindow.on('close', (event) => {
     if (!serverProcess) return;
     event.preventDefault();
     mainWindow.webContents.send('close-requested');
   });
   mainWindow.on('closed', () => { mainWindow = null; });
+}
+
+function sendUpdateStatus(state, details = {}) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update-status', { state, ...details });
+}
+
+function formatUpdateError(error) {
+  const message = String(error?.message || '未知更新错误');
+  if (/Cannot find latest\.yml|latest\.yml[\s\S]*404/i.test(message)) {
+    return 'GitHub 最新 Release 缺少自动更新文件 latest.yml。';
+  }
+  if (/404|Not Found/i.test(message)) return 'GitHub Release 或更新文件不存在。';
+  if (/ENOTFOUND|ERR_NAME_NOT_RESOLVED|net::ERR_INTERNET_DISCONNECTED/i.test(message)) return '当前无法连接 GitHub，请检查网络。';
+  return message.split(/\r?\n/, 1)[0].slice(0, 240);
+}
+
+function setupAutoUpdates() {
+  if (!app.isPackaged) return;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.allowPrerelease = false;
+  autoUpdater.allowDowngrade = false;
+  autoUpdater.on('checking-for-update', () => sendUpdateStatus('checking'));
+  autoUpdater.on('update-available', (info) => sendUpdateStatus('available', { version: info.version }));
+  autoUpdater.on('update-not-available', (info) => sendUpdateStatus('not-available', { version: info.version }));
+  autoUpdater.on('download-progress', (progress) => sendUpdateStatus('progress', {
+    percent: Math.max(0, Math.min(100, Math.round(progress.percent || 0))),
+    transferred: progress.transferred,
+    total: progress.total
+  }));
+  autoUpdater.on('update-downloaded', (info) => {
+    downloadedUpdateVersion = info.version;
+    sendUpdateStatus('downloaded', { version: info.version });
+  });
+  autoUpdater.on('error', (error) => sendUpdateStatus('error', { message: formatUpdateError(error) }));
+  const check = () => autoUpdater.checkForUpdates().catch(() => {});
+  setTimeout(check, 4000);
+  setInterval(check, 6 * 60 * 60 * 1000).unref();
 }
 
 function emitConsole(text, kind = 'normal') {
@@ -625,6 +668,13 @@ ipcMain.handle('kill-server', () => {
   return true;
 });
 
-app.whenReady().then(createWindow);
+ipcMain.handle('install-update', () => {
+  if (!downloadedUpdateVersion) return { ok: false, error: '更新尚未下载完成。' };
+  if (serverProcess) return { ok: false, error: '请先停止服务器，再安装更新。' };
+  setImmediate(() => autoUpdater.quitAndInstall(false, true));
+  return { ok: true };
+});
+
+app.whenReady().then(() => { createWindow(); setupAutoUpdates(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

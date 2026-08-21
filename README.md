@@ -10,7 +10,18 @@
 4. 首次启动时阅读并确认 Minecraft EULA。
 5. 在下方控制台查看日志或发送命令，结束时点击“停止服务器”。
 
-左侧“我的服务器”可新增并切换服务器。右上角“下载核心”会从项目官方接口读取版本并下载到当前服务器目录，完成后自动选中对应 JAR。
+左侧“我的服务器”可新增、重命名、删除配置并切换服务器。“下载服务器核心”会从项目官方接口读取版本，并在 `Serverlist` 下创建独立服务器目录，完成后自动选中对应 JAR。
+
+## 发布更新
+
+项目使用 GitHub Release 自动更新。修改代码后先更新 `package.json` 的版本号并推送源码，然后创建并推送同版本标签，例如：
+
+```powershell
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+`.github/workflows/release.yml` 会自动检查代码、构建 Windows 安装程序，并把安装包、blockmap 和 `latest.yml` 发布到 GitHub Release。标签版本必须与 `package.json` 完全一致。已安装的软件会定期检查公开 Release，新版本下载完成后提示重启安装；服务器运行期间不会执行更新。
 
 ## 开发命令
 
@@ -19,6 +30,7 @@ npm install
 npm start
 npm run check
 npm run folder
+npm run installer
 ```
 
-构建后的完整程序文件夹位于 `dist/win-unpacked/`，使用时必须保留文件夹内全部文件。
+构建后的完整程序文件夹位于 `dist/win-unpacked/`，安装程序和更新元数据位于 `dist/`。
