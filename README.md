@@ -17,8 +17,8 @@
 项目使用 GitHub Release 自动更新。修改代码后先更新 `package.json` 的版本号并推送源码，然后创建并推送同版本标签，例如：
 
 ```powershell
-git tag v1.2.2
-git push origin v1.2.2
+git tag v1.2.3
+git push origin v1.2.3
 ```
 
 `.github/workflows/release.yml` 会自动检查代码、构建 Windows 安装程序，并把安装包、blockmap 和 `latest.yml` 发布到 GitHub Release。标签版本必须与 `package.json` 完全一致。已安装的软件会定期检查公开 Release，新版本下载完成后提示重启安装；服务器运行期间不会执行更新。

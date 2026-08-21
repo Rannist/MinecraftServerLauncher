@@ -1,6 +1,6 @@
 {
   "name": "minecraft-server-launcher",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "现代化 Minecraft Java 版图形开服器",
   "main": "main.js",
   "repository": {

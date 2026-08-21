@@ -339,7 +339,7 @@ function formatUpdateError(error) {
 function setupAutoUpdates() {
   if (!app.isPackaged) return;
   autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowPrerelease = false;
   autoUpdater.allowDowngrade = false;
   autoUpdater.on('checking-for-update', () => sendUpdateStatus('checking'));
