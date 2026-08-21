@@ -1,0 +1,32 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('launcher', {
+  windowAction: (action) => ipcRenderer.invoke('window-action', action),
+  forceCloseWindow: () => ipcRenderer.invoke('force-close-window'),
+  selectJar: () => ipcRenderer.invoke('select-jar'),
+  selectDirectory: (purpose) => ipcRenderer.invoke('select-directory', purpose),
+  loadConfig: () => ipcRenderer.invoke('load-config'),
+  saveConfig: (config) => ipcRenderer.invoke('save-config', config),
+  getDefaultServerRoot: () => ipcRenderer.invoke('get-default-server-root'),
+  getCoreCatalog: () => ipcRenderer.invoke('get-core-catalog'),
+  getCoreVersions: (coreId) => ipcRenderer.invoke('get-core-versions', coreId),
+  openCoreWebsite: (coreId) => ipcRenderer.invoke('open-core-website', coreId),
+  downloadCore: (request) => ipcRenderer.invoke('download-core', request),
+  detectJava: () => ipcRenderer.invoke('detect-java'),
+  checkEula: (directory) => ipcRenderer.invoke('check-eula', directory),
+  acceptEula: (directory) => ipcRenderer.invoke('accept-eula', directory),
+  readServerProperties: (directory) => ipcRenderer.invoke('read-server-properties', directory),
+  writeServerProperties: (directory, values) => ipcRenderer.invoke('write-server-properties', directory, values),
+  listServerPlugins: (directory) => ipcRenderer.invoke('list-server-plugins', directory),
+  openPluginsDirectory: (directory) => ipcRenderer.invoke('open-plugins-directory', directory),
+  startServer: (options) => ipcRenderer.invoke('start-server', options),
+  sendCommand: (command) => ipcRenderer.invoke('send-command', command),
+  completeServerCommand: (command) => ipcRenderer.invoke('complete-server-command', command),
+  stopServer: () => ipcRenderer.invoke('stop-server'),
+  killServer: () => ipcRenderer.invoke('kill-server'),
+  onServerOutput: (callback) => ipcRenderer.on('server-output', (_, value) => callback(value)),
+  onDownloadProgress: (callback) => ipcRenderer.on('download-progress', (_, value) => callback(value)),
+  onServerState: (callback) => ipcRenderer.on('server-state', (_, value) => callback(value)),
+  onStopTimeout: (callback) => ipcRenderer.on('stop-timeout', callback),
+  onCloseRequested: (callback) => ipcRenderer.on('close-requested', callback)
+});

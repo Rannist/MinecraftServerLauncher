@@ -1,0 +1,60 @@
+{
+  "name": "minecraft-server-launcher",
+  "version": "1.1.0",
+  "description": "现代化 Minecraft Java 版图形开服器",
+  "main": "main.js",
+  "author": "RANNIST",
+  "license": "MIT",
+  "scripts": {
+    "start": "node_modules\\electron\\dist\\electron.exe .",
+    "check": "node --check main.js && node --check preload.js && node --check renderer/app.js",
+    "folder": "electron-builder --win --x64 --dir",
+    "installer": "electron-builder --win nsis --x64",
+    "dist": "npm run installer"
+  },
+  "devDependencies": {
+    "electron": "^37.10.3",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.rannist.minecraft.serverlauncher",
+    "productName": "Minecraft开服器",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "assets/**/*",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "outputs/jars/LauncherCompletionBridge.jar",
+        "to": "completion/LauncherCompletionBridge.jar"
+      }
+    ],
+    "win": {
+      "target": "dir",
+      "icon": "assets/app-icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Minecraft开服器",
+      "installerIcon": "assets/app-icon.ico",
+      "uninstallerIcon": "assets/app-icon.ico",
+      "include": "build/installer.nsh",
+      "installerLanguages": [
+        "zh_CN"
+      ],
+      "artifactName": "Minecraft开服器-安装程序-${version}.${ext}",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}
